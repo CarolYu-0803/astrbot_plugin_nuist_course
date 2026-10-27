@@ -1,0 +1,44 @@
+{
+  "state_dir": {
+    "description": "学校会话和课表目录",
+    "type": "string",
+    "default": "",
+    "hint": "留空使用 data/plugin_data/astrbot_plugin_nuist_course/state。可指定已有 state 的绝对路径；相对路径从插件数据目录计算。Docker 中填写容器内路径。"
+  },
+  "default_push_time": {
+    "description": "未填写参数时的默认推送时间",
+    "type": "string",
+    "default": "07:00",
+    "hint": "北京时间。仅用于不带参数的 /设置时间；已有订阅保持各自设置。"
+  },
+  "cache_max_age_days": {
+    "description": "备用课表最长保留天数",
+    "type": "int",
+    "default": 7,
+    "hint": "0–180；0 表示禁用。学校会话失效时，仅使用有效期内的同学期快照，并注明缓存。"
+  },
+  "request_timeout_seconds": {
+    "description": "学校接口单次请求超时秒数",
+    "type": "int",
+    "default": 25,
+    "hint": "1–120 秒。学校网络请求在后台线程执行。"
+  },
+  "date_overrides": {
+    "description": "调休日期映射（JSON）",
+    "type": "string",
+    "default": "{}",
+    "hint": "例如 {\"2026-10-31\":\"2026-10-27\",\"2026-11-01\":null} 表示前者按指定日期上课、后者停课。请以学校通知为准。"
+  },
+  "keepalive_interval_minutes": {
+    "description": "自动保活间隔（分钟）",
+    "type": "int",
+    "default": 5,
+    "hint": "默认每 5 分钟访问学校接口并尝试续期门户登录态。可设 1–20；0 关闭。即使没有订阅也保活。已完全过期的认证可能仍需人工登录。"
+  },
+  "auto_sso_recovery": {
+    "description": "自动恢复教务登录态",
+    "type": "bool",
+    "default": true,
+    "hint": "接口提示未登录时，尝试复用现有门户 Cookie 重新进入教务系统并验证接口，最多重试一次。不保存账号密码，遇到验证码或门户也过期时需重新运行 login。"
+  }
+}

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nuist-course-notifier"
+version = "2.1.0"
+description = "NUIST 理实一体课表 AstrBot 插件与登录助手"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.28,<1", "filelock>=3.16", "tzdata>=2025.1"]
+
+[project.optional-dependencies]
+login = ["playwright>=1.51,<2"]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+nuist-course = "coursebot.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["coursebot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

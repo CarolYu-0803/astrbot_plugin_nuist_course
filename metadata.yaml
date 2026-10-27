@@ -1,0 +1,6 @@
+name: astrbot_plugin_nuist_course
+display_name: 南信大课表
+desc: 南信大理实一体课表查询，支持各会话独立设置每日推送时间。
+version: v2.1.0
+author: NUIST Course Notifier
+astrbot_version: ">=4.5.0"

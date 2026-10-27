@@ -1,0 +1,9 @@
+{
+  "state_dir": "state",
+  "cache_max_age_days": 7,
+  "request_timeout_seconds": 25,
+  "keepalive_interval_minutes": 5,
+  "auto_sso_recovery": true,
+  "date_overrides": {}
+}
+
