@@ -1,8 +1,7 @@
 import re
-import time
 from datetime import date
 from http.cookiejar import Cookie
-from urllib.parse import urljoin, urlparse, urldefrag
+from urllib.parse import urlparse
 
 import httpx
 
@@ -38,16 +37,12 @@ def rows(payload, name):
 
 
 class SchoolClient:
-    def __init__(self, session_path, timeout=25, transport=None, *, auto_recover=True):
+    def __init__(self, session_path, timeout=25, transport=None):
         self.path = session_path
         if not session_path.exists():
-            raise LoginExpired("尚未保存学校会话，请先运行 login 并同步 session.json。")
+            raise LoginExpired("尚未保存学校会话，请配置自动登录或使用人工登录助手。")
         self.session = read_json(session_path)
         self.base = check_base(self.session.get("base_url"))
-        self.auto_recover = auto_recover
-        self.recovered = False
-        self._recovery_attempted = False
-        self.timeout = timeout
         self.http = httpx.Client(timeout=timeout, follow_redirects=False, transport=transport)
         self.http.headers.update({"User-Agent": self.session.get("user_agent", "Mozilla/5.0"),
                                   "Referer": self.base + "/*default/index.do",
@@ -78,73 +73,7 @@ class SchoolClient:
         self.session["updated_at"] = now().isoformat()
         write_json(self.path, self.session)
 
-    def _navigate(self, url, deadline):
-        """Follow ordinary SSO redirects, without sending cookies to other origins."""
-        url = urldefrag(url)[0]
-        for _ in range(10):
-            parsed = urlparse(url)
-            if (parsed.scheme != "https" or parsed.hostname != HOST or parsed.port not in (None, 443)
-                    or parsed.username is not None or parsed.password is not None):
-                raise LoginExpired("学校登录跳转离开已验证的 WebVPN 地址，无法自动续期，请重新运行 login。")
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise CourseError("学校登录续期超时，请检查网络或重新登录。")
-            try:
-                response = self.http.get(url, timeout=min(self.timeout, remaining),
-                                         headers={"Accept": "text/html", "X-Requested-With": ""})
-            except httpx.HTTPError:
-                raise CourseError("连接学校登录入口失败或超时，请检查服务器网络。") from None
-            if response.is_redirect:
-                location = response.headers.get("location")
-                if not location:
-                    raise LoginExpired("学校登录入口缺少跳转地址，请重新运行 login。")
-                url = urljoin(str(response.url), location)
-                continue
-            if response.status_code in (401, 403):
-                raise LoginExpired("门户登录已失效，自动续期未成功，请重新运行 login。")
-            if response.status_code != 200:
-                raise CourseError(f"学校登录入口返回 HTTP {response.status_code}。")
-            # A 200 HTML login page alone is never proof of a valid school session.
-            return
-        raise LoginExpired("学校登录跳转次数过多，可能需要验证码或重新登录。")
-
-    def _recover_session(self):
-        self._recovery_attempted = True
-        deadline = time.monotonic() + 45
-        self._navigate(ENTRY, deadline)
-        academic = self.base.rsplit("/jwapp/", 1)[0] + "/jwapp/sys/emaphome/portal/index.do"
-        self._navigate(academic, deadline)
-        self._navigate(self.base + "/*default/index.do", deadline)
-
-    def keep_alive(self):
-        # Touch the portal as well as the authenticated teaching API: the two
-        # sessions can have independent idle timeouts. Never refresh snapshot age here.
-        portal_warning = ""
-        try:
-            self._navigate(ENTRY, time.monotonic() + 30)
-        except CourseError as error:
-            # Keep the teaching session alive even if the portal is unavailable.
-            portal_warning = str(error)
-        terms = self.query("jshkcb", "dqxnxq")
-        if len(terms) != 1 or not re.fullmatch(r"\d{4}-\d{4}-[123]", str(terms[0].get("DM", ""))):
-            raise DataError("保活未能确认当前学期，不能认定登录有效。")
-        return {"recovered": self.recovered, "portal_warning": "" if self.recovered else portal_warning}
-
     def query(self, group, name, data=None):
-        try:
-            result = self._query_once(group, name, data)
-        except LoginExpired:
-            if not self.auto_recover or self._recovery_attempted:
-                raise
-            self._recover_session()
-            # Replaying these read-only queries is safe. Verify the API, not an HTML page.
-            result = self._query_once(group, name, data)
-            self.recovered = True
-        # Persist rotating cookies even if a later request in the full fetch fails.
-        self.save_session()
-        return result
-
-    def _query_once(self, group, name, data=None):
         # These are the read-only POST endpoints observed in the school's own UI.
         url = f"{self.base}/modules/{group}/{name}.do?enlink-vpn"
         try:
@@ -152,15 +81,13 @@ class SchoolClient:
         except httpx.HTTPError:
             raise CourseError("连接学校失败或超时，请检查服务器网络。") from None
         if response.is_redirect or response.status_code in (401, 403):
-            raise LoginExpired("学校登录已失效，请重新运行 login 并上传会话文件。")
+            raise LoginExpired("学校登录已失效，请检查自动登录状态或使用人工登录助手。")
         if response.status_code != 200:
             raise CourseError(f"学校服务返回 HTTP {response.status_code}。")
         try:
             payload = response.json()
         except ValueError:
             raise LoginExpired("学校返回了登录页或非 JSON 页面，请更新登录状态。") from None
-        if isinstance(payload, dict) and str(payload.get("code")) in {"401", "403"}:
-            raise LoginExpired("学校接口提示登录已失效，请重新运行 login。")
         return rows(payload, name)
 
     def fetch(self, target):

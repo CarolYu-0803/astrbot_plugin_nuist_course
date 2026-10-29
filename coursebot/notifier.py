@@ -9,8 +9,8 @@ from uuid import uuid4
 
 from filelock import FileLock, Timeout
 
-from .errors import CourseError, StateBusy
-from .runner import build_message, keep_alive
+from .errors import CourseError, LoginExpired
+from .runner import build_message, prepare_timetable
 from .storage import TZ, now, read_json, write_json
 
 
@@ -30,11 +30,12 @@ def at_time(day, value):
 
 
 class CourseNotifier:
-    def __init__(self, cfg, data_dir, sender, *, clock=now, fetch=build_message, logger=None):
+    def __init__(self, cfg, data_dir, sender, *, clock=now, fetch=build_message, logger=None, recover=None):
         self.cfg = cfg
         self.sender = sender
         self.clock = clock
         self.fetch = fetch
+        self.recover = recover
         self.logger = logger or logging.getLogger(__name__)
         self.path = Path(data_dir) / "subscriptions.json"
         self._lock = asyncio.Lock()
@@ -98,21 +99,36 @@ class CourseNotifier:
             self._commit(subscriptions)
             return True
 
-    def _with_state_lock(self, operation, *args):
+    def _read_message(self, target, defer_login=False, structured=False):
         try:
             with FileLock(str(self.cfg["state_dir"] / "run.lock"), timeout=0):
-                return operation(self.cfg, *args)
+                if structured:
+                    return prepare_timetable(self.cfg, target, defer_login=defer_login)
+                if self.fetch is build_message:
+                    return self.fetch(self.cfg, target, defer_login=defer_login)
+                return self.fetch(self.cfg, target)
         except Timeout:
-            raise StateBusy("课表正在被登录或同步助手更新，请稍后再试。") from None
+            raise CourseError("课表正在被登录或同步助手更新，请稍后再试。") from None
 
-    async def view(self, target=None):
+    async def view(self, target=None, *, structured=False):
         target = target or self.clock().astimezone(TZ).date()
         async with self._fetch_lock:
-            return await asyncio.to_thread(self._with_state_lock, self.fetch, target)
+            try:
+                return await asyncio.to_thread(self._read_message, target, bool(self.recover), structured)
+            except LoginExpired:
+                if self.recover is None:
+                    raise
+                # The file lock has been released before the user is asked for a code.
+                try:
+                    await self.recover()
+                except CourseError:
+                    # Existing cache rules still apply when login is unavailable.
+                    pass
+                return await asyncio.to_thread(self._read_message, target, structured=structured)
 
-    async def maintain_login(self):
-        async with self._fetch_lock:
-            return await asyncio.to_thread(self._with_state_lock, keep_alive)
+    async def timetable(self, target=None):
+        """Read structured data for LLM tools without changing subscriptions or deliveries."""
+        return await self.view(target, structured=True)
 
     async def _claim(self, origin, expected, moment):
         async with self._lock:

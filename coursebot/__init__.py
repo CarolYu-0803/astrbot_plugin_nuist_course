@@ -1,2 +1,2 @@
-"""NUIST course notifications. No account password is stored."""
+"""NUIST course notifications with optional interactive login recovery."""
 

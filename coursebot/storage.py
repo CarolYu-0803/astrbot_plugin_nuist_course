@@ -57,21 +57,21 @@ def config_values(data, base_dir):
             raise ValueError
         if not isinstance(data.get("date_overrides", {}), dict):
             raise ValueError
+        if type(data.get("auto_login_enabled", False)) is not bool:
+            raise ValueError
+        data["auto_login_enabled"] = data.get("auto_login_enabled", False)
+        for name, default, lower, upper in (
+            ("login_code_timeout_seconds", 180, 60, 600),
+            ("login_retry_minutes", 30, 5, 1440),
+            ("session_check_minutes", 60, 5, 1440),
+        ):
+            data[name] = int(data.get(name, default))
+            if not lower <= data[name] <= upper:
+                raise ValueError
+        if data.get("login_browser_channel", "") not in ("", "chrome", "msedge"):
+            raise ValueError
     except (ValueError, TypeError):
-        raise CourseError("配置格式错误：缓存天数应为 0–180，超时应为 1–120 秒。") from None
-    try:
-        interval = data.get("keepalive_interval_minutes", 5)
-        if (isinstance(interval, bool) or not (isinstance(interval, int)
-                or (isinstance(interval, str) and interval.isascii() and interval.isdigit()))):
-            raise ValueError
-        data["keepalive_interval_minutes"] = int(interval)
-        if not 0 <= data["keepalive_interval_minutes"] <= 20:
-            raise ValueError
-        data["auto_sso_recovery"] = data.get("auto_sso_recovery", True)
-        if type(data["auto_sso_recovery"]) is not bool:
-            raise ValueError
-    except (TypeError, ValueError):
-        raise CourseError("保活配置错误：间隔须为 0–20 的整数分钟（0 关闭），自动恢复登录须为布尔值。") from None
+        raise CourseError("配置格式错误：缓存天数 0–180，请求超时 1–120 秒，验证码等待 60–600 秒，登录重试及检查间隔 5–1440 分钟；浏览器通道留空、chrome 或 msedge。") from None
     data["state_dir"].mkdir(parents=True, exist_ok=True, mode=0o700)
     return data
 

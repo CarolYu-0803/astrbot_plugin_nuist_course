@@ -6,10 +6,10 @@ class LoginExpired(CourseError):
     pass
 
 
-class DataError(CourseError):
+class CredentialsRejected(CourseError):
     pass
 
 
-class StateBusy(CourseError):
+class DataError(CourseError):
     pass
 

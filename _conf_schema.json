@@ -1,4 +1,46 @@
 {
+  "auto_login_enabled": {
+    "description": "自动重新登录学校",
+    "type": "bool",
+    "default": false,
+    "hint": "开启前请安装 Playwright Chromium，并由 AstrBot 管理员私聊发送 /绑定课表登录。会话失效时自动登录，图片及短信验证码通过该私聊交互。"
+  },
+  "login_username": {
+    "description": "统一身份认证学号/工号",
+    "type": "string",
+    "default": "",
+    "hint": "也可通过 NUIST_COURSE_USERNAME 环境变量提供，环境变量优先。一个插件实例使用一个学校账号。"
+  },
+  "login_password": {
+    "description": "统一身份认证密码",
+    "type": "string",
+    "default": "",
+    "hint": "推荐用 NUIST_COURSE_PASSWORD 环境变量提供并将此项留空。面板填写的密码将保存在 AstrBot 插件配置中，请限制配置文件访问权限。不要通过聊天发送密码。"
+  },
+  "login_code_timeout_seconds": {
+    "description": "每次等待图片/短信验证码的秒数",
+    "type": "int",
+    "default": 180,
+    "hint": "60–600 秒。验证码仅接受绑定管理员私聊的本次验证编号，超时后本次登录结束。"
+  },
+  "login_retry_minutes": {
+    "description": "自动登录失败后的重试间隔（分钟）",
+    "type": "int",
+    "default": 30,
+    "hint": "5–1440 分钟。学校拒绝账号或密码时暂停自动重试，检查配置后用 /课表登录 手动恢复。"
+  },
+  "session_check_minutes": {
+    "description": "后台学校会话检查间隔（分钟）",
+    "type": "int",
+    "default": 60,
+    "hint": "5–1440 分钟。仅在开启自动登录且绑定管理员私聊后生效。检查时同步课表；失效则重新登录。查询课表时也会按需恢复登录。"
+  },
+  "login_browser_channel": {
+    "description": "自动登录浏览器通道",
+    "type": "string",
+    "default": "",
+    "hint": "留空使用 Playwright Chromium；可填 chrome 或 msedge，需在 AstrBot 所在机器预先安装相应浏览器。"
+  },
   "state_dir": {
     "description": "学校会话和课表目录",
     "type": "string",
@@ -28,17 +70,5 @@
     "type": "string",
     "default": "{}",
     "hint": "例如 {\"2026-10-31\":\"2026-10-27\",\"2026-11-01\":null} 表示前者按指定日期上课、后者停课。请以学校通知为准。"
-  },
-  "keepalive_interval_minutes": {
-    "description": "自动保活间隔（分钟）",
-    "type": "int",
-    "default": 5,
-    "hint": "默认每 5 分钟访问学校接口并尝试续期门户登录态。可设 1–20；0 关闭。即使没有订阅也保活。已完全过期的认证可能仍需人工登录。"
-  },
-  "auto_sso_recovery": {
-    "description": "自动恢复教务登录态",
-    "type": "bool",
-    "default": true,
-    "hint": "接口提示未登录时，尝试复用现有门户 Cookie 重新进入教务系统并验证接口，最多重试一次。不保存账号密码，遇到验证码或门户也过期时需重新运行 login。"
   }
 }
